@@ -84,7 +84,7 @@ void main() {
 #version 300 es
 precision mediump float;
 
-uniform sampler2D u_Sprite;
+uniform mediump sampler2DArray u_Sprite;
 
 in float v_Age;
 in float v_Life;
@@ -95,7 +95,7 @@ out vec4 o_FragColor;
 void main() {
   float t =  v_Age/v_Life;
   vec4 color = vec4(vec3(1.0, 1.f, 1.f), 1.0-(v_Age/v_Life));
-  o_FragColor = color * texture(u_Sprite, v_TexCoord);
+  o_FragColor = color * texture(u_Sprite, vec3(v_TexCoord, t * 4.f));
 }
     </script>
   </head>

@@ -15,6 +15,40 @@ function camera_OrthoProjection(pos, width, height)
 	return res;
 }
 
+async function loadImages(gl, paths, width, height)
+{
+  const images = [];
+  for(let i = 0; i < paths.length; i += 1)
+  {
+    images.push(await loadImage(paths[i]));
+  }
+
+  var particle_tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, particle_tex);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, images.length - 1, gl.RGBA8, width, height, images.length);
+  for(let i = 0; i < images.length; i += 1)
+  {
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1,
+      gl.RGBA, gl.UNSIGNED_BYTE, images[i]);
+  }
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  return particle_tex;
+}
+
+function loadImage(url) {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.addEventListener('load', () => {
+      resolve(image);
+    });
+    image.src = url;
+  });
+}
+
 function createShader(gl, shader_info) {
   var shader = gl.createShader(shader_info.type);
   var i = 0;
@@ -130,8 +164,7 @@ function init(
     max_theta,
     min_speed,
     max_speed,
-    gravity,
-    part_img) { // Note the new parameter.
+    gravity) { // Note the new parameter.
   if (max_age < min_age) {
     throw "Invalid min-max age range.";
   }
@@ -320,6 +353,12 @@ function init(
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
+  // var particle_tex = gl.createTexture();
+  // gl.bindTexture(gl.TEXTURE_2D, particle_tex);
+  // // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 32, 32, 0, gl.RGBA, gl.UNSIGNED_BYTE, part_img);
+  // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, part_img);
+  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   return {
     particle_sys_buffers: buffers,
     particle_sys_vaos: vaos,
@@ -403,7 +442,7 @@ function render(gl, state, timestamp_millis) {
   gl.bindVertexArray(state.particle_sys_vaos[state.read + 2]);
   gl.useProgram(state.particle_render_program);
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, state.particle_tex);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, state.particle_tex);
   gl.uniformMatrix4fv(
     gl.getUniformLocation(state.particle_render_program, "u_wvp"),
     false, camera_OrthoProjection([0, 0], 800, 600));
@@ -427,28 +466,36 @@ function main() {
   var webgl_context = canvas_element.getContext("webgl2");
   if (webgl_context != null) {
     document.body.appendChild(canvas_element);
-    var part_img = new Image();
-    part_img.src = "feather.png";
-    part_img.onload = function () {
+    
+    loadImages(webgl_context,
+      [
+        "./sakura0.png",
+        "./sakura1.png",
+        "./sakura2.png",
+        "./sakura3.png",
+        // "./sakura4.png",
+      ],
+      24, 24).then((part_img) => {
       var state =
         init(
           webgl_context,
-          100,
+          200,
           0.90,
           0.8, 1.9,
           -Math.PI, Math.PI,
           0.0, 10.5,
-          [0.0, -500.0],
-          part_img);
+          [0.0, -500.0]);
       // canvas_element.onmousemove = function(e) {
       //   var x = (e.pageX - this.offsetLeft) - this.width / 2; 
       //   var y = -(e.pageY - this.offsetTop) + this.height / 2;
       //   state.origin = [x, y];
       // };
+      // state.origin = [200.0 * Math.cos(4.0 * ts), 200.0];
       state.size = 35.0;
+      state.particle_tex = part_img;
       window.requestAnimationFrame(
         function(ts) { render(webgl_context, state, ts); });
-    }
+    });
   } else {
     document.write("WebGL2 is not supported by your browser");
   }
